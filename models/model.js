@@ -2,20 +2,21 @@
 /// =============================== HENRY-FLIX ================================ ///
 /// =========================================================================== ///
 
-'use strict'
+'use strict';
 
-const categories = ['regular', 'premium']
+const e = require('express');
 
-let users = []
-let series = []
+const categories = ['regular', 'premium'];
+
+let users = [];
+let series = [];
 
 module.exports = {
-
   reset: function () {
     // No es necesario modificar esta función. La usamos para "limpiar" los arreglos entre test y test.
 
-    users = []
-    series = []
+    users = [];
+    series = [];
   },
 
   // ==== COMPLETAR LAS SIGUIENTES FUNCIONES (vean los test de `model.js`) =====
@@ -29,20 +30,53 @@ module.exports = {
     // {  email: email, name: name,  plan: 'regular' , watched: []}
     // En caso exitoso debe retornar el string 'Usuario <email_del_usuario> creado correctamente'.
 
+    const userFound = users.find(e => e.email === email);
+
+    if (userFound) {
+      throw Error('El usuario ya existe');
+    } else {
+      users.push({
+        email: email,
+        name: name,
+        plan: 'regular',
+        watched: [],
+      });
+      return `Usuario ${email} creado correctamente`;
+    }
   },
 
   listUsers: function (plan) {
     // Si no recibe parámetro, devuelve un arreglo con todos los usuarios.
     // En caso de recibir el parámetro <plan>, devuelve sólo los usuarios correspondientes a dicho plan ('regular' o 'premium').
-
+    if (plan === 'regular') {
+      const regularUsers = users.filter(u => {
+        return u.plan === 'regular';
+      });
+      return regularUsers;
+    } else if (plan === 'premium') {
+      const premiumUsers = users.filter(u => {
+        return u.plan === 'premium';
+      });
+      return premiumUsers;
+    }
+    return users;
   },
 
   switchPlan: function (email) {
-  // Alterna el plan del usuario: si es 'regular' lo convierte a 'premium' y viceversa.
-  // Retorna el mensaje '<Nombre_de_usuario>, ahora tienes el plan <nuevo_plan>'
-  // Ej: 'Martu, ahora tienes el plan premium'
-  // Si el usuario no existe, arroja el Error ('Usuario inexistente')
+    // Alterna el plan del usuario: si es 'regular' lo convierte a 'premium' y viceversa.
+    // Retorna el mensaje '<Nombre_de_usuario>, ahora tienes el plan <nuevo_plan>'
+    // Ej: 'Martu, ahora tienes el plan premium'
+    // Si el usuario no existe, arroja el Error ('Usuario inexistente')
+    let userFound = users.find(e => e.email === email);
+    if (!userFound) throw Error('Usuario inexistente');
 
+    if (userFound.plan === 'regular') {
+      userFound.plan = 'premium';
+      return `${userFound.name}, ahora tienes el plan ${userFound.plan}`;
+    } else if (userFound.plan === 'premium') {
+      userFound.plan = 'regular';
+      return `${userFound.name}, ahora tienes el plan regular`;
+    }
   },
 
   addSerie: function (name, seasons, category, year) {
@@ -53,14 +87,47 @@ module.exports = {
     // Debe guardar la propiedad <category> de la serie (regular o premium)
     // Debe guardar la propiedade <rating> inicializada 0
     // Debe guardar la propiedade <reviews> que incialmente es un array vacío.
+    const serieFound = series.find(e => e.name === name);
 
+    if (serieFound) throw Error(`La serie ${name} ya existe`);
+    if (!categories.includes(category))
+      throw Error(`La categoría ${category} no existe`);
+
+    if (!series.includes(name)) {
+      series.push({
+        name: name,
+        seasons: seasons,
+        rating: 0,
+        category: category,
+        year: year,
+        reviews: [],
+      });
+    }
+
+    return series;
   },
 
   listSeries: function (category) {
     // Devuelve un arreglo con todas las series.
     // Si recibe una categoría como parámetro, debe filtrar sólo las series pertenecientes a la misma (regular o premium).
     // Si la categoría no existe, arroja un Error ('La categoría <nombre_de_la_categoría> no existe') y no agrega la serie.
+    if (category === undefined) return series;
+    if (category === 'regular') {
+      const regularSerie = series.filter(u => {
+        return u.category === 'regular';
+      });
+      return regularSerie;
+    }
 
+    if (category === 'premium') {
+      const premiumSerie = series.filter(u => {
+        return u.category === 'premium';
+      });
+      return premiumSerie;
+    }
+
+    if (!categories.includes(category))
+      throw Error(`La categoría ${category} no existe`);
   },
 
   play: function (serie, email) {
@@ -71,13 +138,27 @@ module.exports = {
     // En caso de contrario arrojar el Error ('Contenido no disponible, contrata ahora HenryFlix Premium!')
     // En caso exitoso, añadir el nombre (solo el nombre) de la serie a la propiedad <watched> del usuario.
     // Devuelve un mensaje con el formato: 'Reproduciendo <nombre de serie>'
+    const userFound = users.find(u => u.email === email);
+    const serieFound = series.find(s => s.name === serie);
 
+    if (!userFound) throw Error('Usuario inexistente');
+    if (!serieFound) throw Error('Serie inexistente');
+
+    if (serieFound.category === 'premium' && userFound.plan !== 'premium') {
+      throw Error('Contenido no disponible, contrata ahora HenryFlix Premium!');
+    }
+
+    userFound.watched.push(serieFound.name);
+    return `Reproduciendo ${serieFound.name}`;
   },
 
   watchAgain: function (email) {
     // Devuelve sólo las series ya vistas por el usuario
     // Si el usuario no existe, arroja el Error ('Usuario inexistente')
+    const userFound = users.find(e => e.email === email);
+    if (!userFound) throw Error('Usuario inexistente');
 
+    return userFound.watched;
   },
 
   rateSerie: function (serie, email, score) {
@@ -89,7 +170,22 @@ module.exports = {
     // Si la serie no existe, arroja el Error ('Serie inexistente') y no actualiza el puntaje.
     // Debe recibir un puntaje entre 1 y 5 inclusive. En caso contrario arroja el Error ('Puntaje inválido') y no actualiza el puntaje.
     // Si el usuario no reprodujo la serie, arroja el Error ('Debes reproducir el contenido para poder puntuarlo') y no actualiza el puntaje. >> Hint: pueden usar la función anterior
+    const userFound = users.find(u => u.email === email);
+    const serieFound = series.find(s => s.name === serie);
 
-  }
+    if (!userFound) throw Error('Usuario inexistente');
+    if (!serieFound) throw Error('Serie inexistente');
 
-}
+    if (score < 1 || score > 5) throw Error('Puntaje inválido');
+
+    if (!userFound.watched.includes(serieFound.name))
+      throw Error('Debes reproducir el contenido para poder puntuarlo');
+
+    serieFound.reviews.push({ email: email, score: score });
+    serieFound.rating =
+      serieFound.reviews.reduce((a, b) => a + b.score, 0) /
+      serieFound.reviews.length;
+
+    return `Le has dado ${score} puntos a la serie ${serieFound.name}`;
+  },
+};
